@@ -1,0 +1,14 @@
+[package]
+name = "wrzawa-solver"
+version = "0.0.1"
+authors = [ "Krzysztof Starecki <krzysztof@starecki.com>" ]
+
+[dependencies]
+rand = "0.3"
+itertools = "0.4.12"
+
+[dependencies.streaming-stats]
+git = "git://github.com/BurntSushi/rust-stats"
+
+[[bin]]
+name = "wrzawa-solver"

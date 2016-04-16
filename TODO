@@ -1,0 +1,11 @@
+General:
+- implement a test suite
+- add max_person_count constraint to Activity
+- (maybe) weight function for preference vs missing participants count
+
+Potential optimizations:
+- (!) replace max_by_key(missing_count) with a priority queue
+- reorder iterator pipelines
+- make input data mutable, remove non-applicable PersonPreferences
+- reuse the RNGs
+- preallocate assignment vectors
