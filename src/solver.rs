@@ -29,31 +29,7 @@ pub fn solve(input: &InputData) -> Solution {
 
     debug!("STAGE 1:");
 
-    for person in input.persons() {
-        let must_haves = person.preferences()
-                               .filter(|x| x.preference == Preference::MustHave)
-                               .map(|x| input.get_activity(x.activity_id))
-                               .collect::<Vec<&Activity>>();
-
-        if must_haves.len() == 2 {
-            if Activity::check_collision(&vec![must_haves[0]], must_haves[1]) {
-                if must_haves[0].module == Module::Sluzba {
-                    solution.add_assignment(person.id, must_haves[0].id);
-                } else if must_haves[1].module == Module::Sluzba {
-                    solution.add_assignment(person.id, must_haves[1].id);
-                } else {
-                    let mh_choice = rng.choose(must_haves.as_slice()).unwrap();
-                    solution.add_assignment(person.id, mh_choice.id)
-                }
-            } else {
-                solution.add_assignment(person.id, must_haves[0].id);
-                solution.add_assignment(person.id, must_haves[1].id);
-            }
-        } else if must_haves.len() == 1 {
-            solution.add_assignment(person.id, must_haves[0].id);
-        }
-    }
-
+    assign_mhs(&mut solution, &input, 1);
     debug!("{:?}\n", solution.person_assignments);
 
     // STAGE 2
@@ -65,43 +41,7 @@ pub fn solve(input: &InputData) -> Solution {
 
     debug!("STAGE 2:");
 
-    let persons = &mut input.persons().collect::<Vec<&Person>>();
-    rng.shuffle(persons);
-
-    for person in persons {
-        let must_haves = person.preferences()
-                               .filter(|x| x.preference == Preference::MustHave)
-                               .map(|x| input.get_activity(x.activity_id))
-                               .collect::<Vec<&Activity>>();
-
-        if must_haves.len() > 2 {
-            let mh_pair = iproduct!(must_haves.iter(), must_haves.iter())
-                              .filter(|&(x, y)| x.id < y.id)
-                              .filter(|&(x, y)| !Activity::check_collision(&vec![x], y))
-                              .max_by_key(|&(x, y)| {
-                                  solution.get_missing_persons_count(x) +
-                                  solution.get_missing_persons_count(y)
-                              });
-
-            match mh_pair {
-                Some((mh1, mh2)) => {
-                    solution.add_assignment(person.id, mh1.id);
-                    solution.add_assignment(person.id, mh2.id);
-                }
-
-                None => {
-                    match must_haves.iter().filter(|x| x.module == Module::Sluzba).next() {
-                        Some(mh) => solution.add_assignment(person.id, mh.id),
-                        None => {
-                            let mh_choice = rng.choose(must_haves.as_slice()).unwrap();
-                            solution.add_assignment(person.id, mh_choice.id)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+    assign_mhs(&mut solution, &input, 2);
     debug!("{:?}\n", solution.person_assignments);
 
     // STAGE 3
@@ -176,6 +116,47 @@ pub fn solve(input: &InputData) -> Solution {
     debug!("{:?}\n", solution.person_assignments);
 
     solution
+}
+
+fn assign_mhs(solution: &mut Solution, input: &InputData, stage: u8) {
+    let mut rng = rand::thread_rng();
+    let mh_cnt_filter = |mh_cnt| (mh_cnt <= 2 && stage == 1) || (mh_cnt > 2 && stage == 2);
+    let mh_persons = &mut input.persons()
+                               .map(|p| (p.must_haves(), p))
+                               .filter(|&(ref mhs, _)| mh_cnt_filter(mhs.len()))
+                               .map(|(mhs, p)| {
+                                   (mhs.iter()
+                                       .map(|mh| input.get_activity(mh.activity_id))
+                                       .collect::<Vec<_>>(),
+                                    p)
+                               })
+                               .collect::<Vec<_>>();
+    if stage == 2 {
+        rng.shuffle(mh_persons);
+    }
+
+    for &(ref mhs, person) in mh_persons.iter() {
+        if mhs.len() >= 2 {
+            let mh_pair = iproduct!(mhs.iter(), mhs.iter())
+                              .filter(|&(x, y)| x.id < y.id)
+                              .filter(|&(x, y)| !Activity::check_collision(&vec![x], y))
+                              .max_by_key(|&(x, y)| {
+                                  solution.get_missing_persons_count(x) +
+                                  solution.get_missing_persons_count(y)
+                              });
+
+            if let Some((mh1, mh2)) = mh_pair {
+                solution.add_assignment(person.id, mh1.id);
+                solution.add_assignment(person.id, mh2.id);
+                continue;
+            }
+        }
+        if let Some(mh) = mhs.iter().filter(|mh| mh.module == Module::Sluzba).next() {
+            solution.add_assignment(person.id, mh.id);
+        } else if let Some(mh) = rng.choose(mhs.as_slice()) {
+            solution.add_assignment(person.id, mh.id);
+        }
+    }
 }
 
 fn assign_activity(solution: &mut Solution, input: &InputData, person: &Person) {
@@ -253,7 +234,6 @@ fn evaluate_activity(activity: &Activity, solution: &Solution) -> u8 {
     if solution.activity_assignments[&activity.id].len() as u8 >= activity.min_person_count {
         1
     } else {
-        println!("dong");
         0
     }
 }

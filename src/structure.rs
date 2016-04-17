@@ -106,6 +106,12 @@ impl<'a> Person<'a> {
     pub fn preferences(&self) -> Iter<PersonPreference> {
         self.preferences.iter()
     }
+
+    pub fn must_haves(&self) -> Vec<&PersonPreference> {
+        self.preferences()
+            .filter(|pp| pp.preference == Preference::MustHave)
+            .collect::<Vec<_>>()
+    }
 }
 
 #[derive(Debug)]
